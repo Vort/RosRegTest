@@ -1,0 +1,12 @@
+﻿<Window x:Class="RosRegTest.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="RosRegTest" Height="350" Width="525">
+    <Grid>
+        <Button Name="RunButton" Content="Run!" HorizontalAlignment="Left" Margin="338,137,0,0" VerticalAlignment="Top" Width="75" Click="RunButton_Click"/>
+        <TextBox Name="RevTextBox" HorizontalAlignment="Left" Height="23" Margin="169,137,0,0" TextWrapping="Wrap" Text="" VerticalAlignment="Top" Width="120"/>
+        <Label Content="Revision:" HorizontalAlignment="Left" Margin="55,135,0,0" VerticalAlignment="Top"/>
+        <Label Content="Additional file:" HorizontalAlignment="Left" Margin="55,166,0,0" VerticalAlignment="Top"/>
+        <TextBox Name="AddFileTextBox" HorizontalAlignment="Left" Height="23" Margin="169,168,0,0" TextWrapping="Wrap" Text="" VerticalAlignment="Top" Width="120"/>
+    </Grid>
+</Window>
