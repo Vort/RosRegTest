@@ -110,6 +110,13 @@ namespace RosRegTest
                 if (!File.Exists(additionalFileName))
                     return;
 
+            bool additionalFileFound = false;
+            if (additionalFileName != null)
+                if (File.Exists(additionalFileName))
+                    additionalFileFound = true;
+
+            bool autoStartChecked = AutoStartCheckBox.IsChecked == true;
+
             RunButton.IsEnabled = false;
 
             Task task = new Task(() =>
@@ -154,8 +161,14 @@ namespace RosRegTest
                     CDBuilder cdb = new CDBuilder();
                     cdb.VolumeIdentifier = cdr.VolumeLabel;
                     CloneCdDirectory("", cdr, cdb);
-                    cdb.AddFile("reactos\\unattend.inf", "unattend.inf");
-                    if (additionalFileName != null)
+
+                    string unattText = File.ReadAllText("unattend.inf", Encoding.ASCII);
+                    if (autoStartChecked)
+                        if (additionalFileFound)
+                            unattText = unattText + "[GuiRunOnce]\n" + "cmd.exe /c start d:\\" + additionalFileName + "\n\n";
+
+                    cdb.AddFile("reactos\\unattend.inf", Encoding.ASCII.GetBytes(unattText));
+                    if (additionalFileFound)
                         cdb.AddFile(additionalFileName, additionalFileName);
 
                     Stream bootImgStr = cdr.OpenBootImage();
@@ -163,6 +176,7 @@ namespace RosRegTest
                     bootImgStr.Close();
 
                     cdb.Build(filenameIsoUnatt + ".temp");
+                    isofs.Close();
 
                     File.Move(filenameIsoUnatt + ".temp", filenameIsoUnatt);
 
