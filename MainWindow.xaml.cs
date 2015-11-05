@@ -15,6 +15,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 
+using Microsoft.Win32;
+
 using SevenZip;
 using DiscUtils.Iso9660;
 using System.Diagnostics;
@@ -23,9 +25,43 @@ namespace RosRegTest
 {
     public partial class MainWindow : Window
     {
+        private string vboxManagePath;
+
+        private bool InitVBoxManagePath()
+        {
+            RegistryKey localKey;
+            if (Environment.Is64BitOperatingSystem)
+                localKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+            else
+                localKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry32);
+
+            RegistryKey subKey = localKey.OpenSubKey("SOFTWARE\\Oracle\\VirtualBox");
+            if (subKey == null)
+                return false;
+
+            object dirObj = subKey.GetValue("InstallDir");
+            if (dirObj == null)
+                return false;
+            if (!(dirObj is string))
+                return false;
+
+            vboxManagePath = (dirObj as string) + "VBoxManage.exe";
+
+            if (!File.Exists(vboxManagePath))
+                return false;
+
+            return true;
+        }
+
         public MainWindow()
         {
             InitializeComponent();
+
+            if (!InitVBoxManagePath())
+            {
+                MessageBox.Show("VirtualBox installation not found",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void CloneCdDirectory(string dir, CDReader cdr, CDBuilder cdb)
@@ -134,7 +170,6 @@ namespace RosRegTest
                     string vmName = string.Format("ReactOS_r{0}", revision);
                     string diskName = Environment.CurrentDirectory + "\\" + vmName + "\\" + vmName + ".vdi";
                     string fullIsoName = Environment.CurrentDirectory + "\\" + filenameIsoUnatt;
-                    string vboxManagePath = "d:\\VirtualBox\\VBoxManage.exe";
                     string deleteVmCmd = string.Format("unregistervm --name {0}", vmName);
                     string createVmCmd = string.Format(
                         "createvm --name {0} --basefolder {1} --ostype WindowsXP --register",
