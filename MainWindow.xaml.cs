@@ -26,6 +26,7 @@ namespace RosRegTest
     public partial class MainWindow : Window
     {
         private string vboxManagePath;
+        private Dictionary<int, string> revToUrl;
 
         private bool InitVBoxManagePath()
         {
@@ -53,6 +54,64 @@ namespace RosRegTest
             return true;
         }
 
+        private void PopulateRevMap(byte[] rawHtmlData, string urlBase)
+        {
+            string rawStr = Encoding.UTF8.GetString(rawHtmlData);
+
+            string[] delims = { "<a href=\"bootcd-", "-dbg.7z" };
+            string[] splitted = rawStr.Split(delims, StringSplitOptions.None);
+
+            int revision = 0;
+            foreach (string s in splitted)
+            {
+                if (s.Length > 10)
+                    continue;
+                if (int.TryParse(s, out revision))
+                {
+                    revToUrl.Add(revision,
+                        string.Format("{0}bootcd-{1}-dbg.7z", urlBase, revision));
+                }
+            }
+        }
+
+        private void InitRevList()
+        {
+            revToUrl = new Dictionary<int, string>();
+
+            if (!File.Exists("rev_list.txt"))
+            {
+                WebClient wc = new WebClient();
+
+                string url1 = "http://iso.reactos.org/bootcd_old/";
+                byte[] bootcdOldData = wc.DownloadData(url1);
+                PopulateRevMap(bootcdOldData, url1);
+                string url2 = "http://iso.reactos.org/bootcd/";
+                byte[] bootcdData = wc.DownloadData(url2);
+                PopulateRevMap(bootcdData, url2);
+
+                StringBuilder sb = new StringBuilder();
+                foreach (var pair in revToUrl)
+                {
+                    sb.Append(pair.Key);
+                    sb.Append('|');
+                    sb.Append(pair.Value);
+                    sb.Append("\n");
+                }
+                File.WriteAllText("rev_list.txt", sb.ToString());
+            }
+            else
+            {
+                string[] pairs = File.ReadAllText("rev_list.txt").Split('\n');
+                foreach (string pair in pairs)
+                {
+                    if (pair == "")
+                        continue;
+                    string[] pairSpl = pair.Split('|');
+                    revToUrl.Add(int.Parse(pairSpl[0]), pairSpl[1]);
+                }
+            }
+        }
+
         public MainWindow()
         {
             InitializeComponent();
@@ -62,6 +121,8 @@ namespace RosRegTest
                 MessageBox.Show("VirtualBox installation not found",
                     "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+
+            InitRevList();
         }
 
         private void CloneCdDirectory(string dir, CDReader cdr, CDBuilder cdb)
@@ -100,6 +161,8 @@ namespace RosRegTest
         {
             int revision = 0;
             if (!int.TryParse(RevTextBox.Text, out revision))
+                return;
+            if (!revToUrl.ContainsKey(revision))
                 return;
 
             string additionalFileName = null;
