@@ -114,6 +114,10 @@ namespace RosRegTest
             }
 
             InitRevList();
+
+            RevTextBox.Focus();
+            RunButton.IsEnabled = false;
+            AutoStartCheckBox.IsEnabled = false;
         }
 
         private void CloneCdDirectory(string dir, CDReader cdr, CDBuilder cdb)
@@ -156,6 +160,9 @@ namespace RosRegTest
             if (!revToUrl.ContainsKey(revision))
                 return;
 
+            if (!File.Exists("unattend.inf"))
+                return;
+
             string additionalFileName = null;
             if (AddFileTextBox.Text != "")
                 additionalFileName = AddFileTextBox.Text;
@@ -172,12 +179,14 @@ namespace RosRegTest
             bool autoStartChecked = AutoStartCheckBox.IsChecked == true;
 
             RunButton.IsEnabled = false;
+            RevTextBox.IsEnabled = false;
+            AddFileTextBox.IsEnabled = false;
+            AutoStartCheckBox.IsEnabled = false;
 
             Task task = new Task(() =>
                 {
                     string filename = string.Format("bootcd-{0}-dbg", revision);
                     string filename7z = filename + ".7z";
-                    string url = "http://iso.reactos.org/bootcd/" + filename7z;
 
                     if (!File.Exists(filename7z))
                     {
@@ -185,7 +194,7 @@ namespace RosRegTest
                             File.Delete(filename7z + ".temp");
 
                         WebClient wc = new WebClient();
-                        wc.DownloadFile(url, filename7z + ".temp");
+                        wc.DownloadFile(revToUrl[revision], filename7z + ".temp");
 
                         File.Move(filename7z + ".temp", filename7z);
                     }
@@ -258,9 +267,27 @@ namespace RosRegTest
                     Exec(vboxManagePath, storageAttachCmd2);
                     Exec(vboxManagePath, startCmd);
 
-                    Dispatcher.Invoke(() => { RunButton.IsEnabled = true; });
+                    Dispatcher.Invoke(() =>
+                    {
+                        RunButton.IsEnabled = true;
+                        RevTextBox.IsEnabled = true;
+                        AddFileTextBox.IsEnabled = true;
+                        AutoStartCheckBox.IsEnabled = AddFileTextBox.Text != "";
+                    });
                 });
             task.Start();
+        }
+
+        private void RevTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        {
+            int revision = 0;
+            int.TryParse(RevTextBox.Text, out revision);
+            RunButton.IsEnabled = revToUrl.ContainsKey(revision);
+        }
+
+        private void AddFileTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        {
+            AutoStartCheckBox.IsEnabled = AddFileTextBox.Text != "";
         }
     }
 }
