@@ -1,16 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 
 using Microsoft.Win32;
-
-using SevenZip;
 using DiscUtils.Iso9660;
-using System.Diagnostics;
+using SevenZip;
 
 namespace RosRegTest
 {
@@ -45,62 +46,99 @@ namespace RosRegTest
             return true;
         }
 
-        private void PopulateRevMap(byte[] rawHtmlData, string urlBase)
+        private List<int> GetRevList(WebClient wc, string url)
         {
+            List<int> revList = new List<int>();
+
+            byte[] rawHtmlData = wc.DownloadData(url);
             string rawStr = Encoding.UTF8.GetString(rawHtmlData);
 
-            string[] delims = { "<a href=\"bootcd-", "-dbg.7z" };
-            string[] splitted = rawStr.Split(delims, StringSplitOptions.None);
+            MatchCollection matches = Regex.Matches(
+                rawStr, "<a href=\"bootcd-([0-9]+)-dbg\\.7z");
+            foreach (Match match in matches)
+                revList.Add(int.Parse(match.Groups[1].Value));
 
-            int revision = 0;
-            foreach (string s in splitted)
-            {
-                if (s.Length > 10)
-                    continue;
-                if (int.TryParse(s, out revision))
-                {
-                    revToUrl.Add(revision,
-                        string.Format("{0}bootcd-{1}-dbg.7z", urlBase, revision));
-                }
-            }
+            return revList;
+        }
+
+        private List<int> GetAdditionalRevList(WebClient wc, int startRev, int endRev)
+        {
+            List<int> revList = new List<int>();
+
+            byte[] rawHtmlData = wc.DownloadData(string.Format(
+                "https://reactos.org/sites/all/modules/reactos/getbuilds/" +
+                "ajax-getfiles.php?filelist=1&startrev={0}&endrev={1}&" +
+                "bootcd-dbg=1&livecd-dbg=0&bootcd-rel=0&livecd-rel=0&requesttype=1&",
+                startRev, endRev));
+            string rawStr = Encoding.UTF8.GetString(rawHtmlData);
+
+            MatchCollection matches = Regex.Matches(
+                rawStr, "<name>bootcd-([0-9]+)-dbg\\.7z</name>");
+            foreach (Match match in matches)
+                revList.Add(int.Parse(match.Groups[1].Value));
+
+            return revList;
+        }
+
+        void WriteRevList(List<int> revList, string fileName)
+        {
+            string listStr = string.Join("\n", revList.ToArray());
+            File.WriteAllText(fileName, listStr, Encoding.ASCII);
+        }
+
+        int[] ReadRevList(string fileName)
+        {
+            string list = File.ReadAllText(fileName, Encoding.ASCII);
+            string[] spl = list.Split('\n');
+            return Array.ConvertAll(spl, int.Parse);
         }
 
         private void InitRevList()
         {
+            WebClient wc = new WebClient();
+
             revToUrl = new Dictionary<int, string>();
 
-            if (!File.Exists("rev_list.txt"))
+            List<int> bootcdOldRevs = new List<int>();
+            if (!File.Exists("bootcd_old_rev_list.txt"))
             {
-                WebClient wc = new WebClient();
-
-                string url1 = "http://iso.reactos.org/bootcd_old/";
-                byte[] bootcdOldData = wc.DownloadData(url1);
-                PopulateRevMap(bootcdOldData, url1);
-                string url2 = "http://iso.reactos.org/bootcd/";
-                byte[] bootcdData = wc.DownloadData(url2);
-                PopulateRevMap(bootcdData, url2);
-
-                StringBuilder sb = new StringBuilder();
-                foreach (var pair in revToUrl)
-                {
-                    sb.Append(pair.Key);
-                    sb.Append('|');
-                    sb.Append(pair.Value);
-                    sb.Append("\n");
-                }
-                File.WriteAllText("rev_list.txt", sb.ToString());
+                bootcdOldRevs = GetRevList(wc, "http://iso.reactos.org/bootcd_old/");
+                WriteRevList(bootcdOldRevs, "bootcd_old_rev_list.txt");
             }
             else
             {
-                string[] pairs = File.ReadAllText("rev_list.txt").Split('\n');
-                foreach (string pair in pairs)
+                bootcdOldRevs.AddRange(ReadRevList("bootcd_old_rev_list.txt"));
+            }
+
+            List<int> bootcdRevs = new List<int>();
+            if (!File.Exists("bootcd_rev_list.txt"))
+            {
+                bootcdRevs = GetRevList(wc, "http://iso.reactos.org/bootcd/");
+                WriteRevList(bootcdRevs, "bootcd_rev_list.txt");
+            }
+            else
+            {
+                bootcdRevs.AddRange(ReadRevList("bootcd_rev_list.txt"));
+
+                string url = "http://iso.reactos.org/bootcd/latest_rev";
+                int lastRemoteRev = int.Parse(Encoding.ASCII.GetString(wc.DownloadData(url)));
+                int lastLocalRev = bootcdRevs[bootcdRevs.Count - 1];
+
+                if (lastLocalRev != lastRemoteRev)
                 {
-                    if (pair == "")
-                        continue;
-                    string[] pairSpl = pair.Split('|');
-                    revToUrl.Add(int.Parse(pairSpl[0]), pairSpl[1]);
+                    int maxFilesPerPage = 100;
+                    if (lastRemoteRev - lastLocalRev > maxFilesPerPage)
+                        bootcdRevs = GetRevList(wc, "http://iso.reactos.org/bootcd/");
+                    else
+                        bootcdRevs.AddRange(GetAdditionalRevList(wc, lastLocalRev + 1, lastRemoteRev));
+                    WriteRevList(bootcdRevs, "bootcd_rev_list.txt");
                 }
             }
+
+            foreach (int revision in bootcdOldRevs)
+                revToUrl.Add(revision, string.Format("{0}bootcd-{1}-dbg.7z", "http://iso.reactos.org/bootcd_old/", revision));
+            foreach (int revision in bootcdRevs)
+                revToUrl.Add(revision, string.Format("{0}bootcd-{1}-dbg.7z", "http://iso.reactos.org/bootcd/", revision));
         }
 
         public MainWindow()
@@ -115,8 +153,9 @@ namespace RosRegTest
 
             InitRevList();
 
+            RevTextBox.Text = revToUrl.Keys.Max().ToString();
+            RevTextBox.CaretIndex = RevTextBox.Text.Length;
             RevTextBox.Focus();
-            RunButton.IsEnabled = false;
             AutoStartCheckBox.IsEnabled = false;
         }
 
