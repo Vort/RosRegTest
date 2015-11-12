@@ -63,21 +63,33 @@ namespace RosRegTest
 
         private List<int> GetAdditionalRevList(WebClient wc, int startRev, int endRev)
         {
-            List<int> revList = new List<int>();
+            SortedSet<int> revSet = new SortedSet<int>();
 
-            byte[] rawHtmlData = wc.DownloadData(string.Format(
-                "http://iso.reactos.org/scripts/ajax-getfiles-provider.php?" +
-                "filelist=1&startrev={0}&endrev={1}&bootcd-dbg=1&" + 
-                "livecd-dbg=0&bootcd-rel=0&livecd-rel=0&requesttype=1&",
-                startRev, endRev));
-            string rawStr = Encoding.UTF8.GetString(rawHtmlData);
+            int pageStartRev = startRev;
+            bool moreFiles = false;
+            for (; ; )
+            {
+                byte[] rawHtmlData = wc.DownloadData(string.Format(
+                    "http://iso.reactos.org/scripts/ajax-getfiles-provider.php?" +
+                    "filelist=1&startrev={0}&endrev={1}&bootcd-dbg=1&" +
+                    "livecd-dbg=0&bootcd-rel=0&livecd-rel=0",
+                    pageStartRev, endRev));
+                string rawStr = Encoding.UTF8.GetString(rawHtmlData);
 
-            MatchCollection matches = Regex.Matches(
-                rawStr, "<name>bootcd-([0-9]+)-dbg\\.7z</name>");
-            foreach (Match match in matches)
-                revList.Add(int.Parse(match.Groups[1].Value));
+                MatchCollection matches = Regex.Matches(
+                    rawStr, "<name>bootcd-([0-9]+)-dbg\\.7z</name>");
+                foreach (Match match in matches)
+                    revSet.Add(int.Parse(match.Groups[1].Value));
 
-            return revList;
+                moreFiles = rawStr.IndexOf("<morefiles>1</morefiles>") != -1;
+                if (!moreFiles)
+                    break;
+
+                pageStartRev = int.Parse(
+                    Regex.Match(rawStr, "<lastrev>([0-9]+)</lastrev>").Groups[1].Value);
+            }
+
+            return revSet.ToList();
         }
 
         void WriteRevList(List<int> revList, string fileName)
@@ -126,8 +138,7 @@ namespace RosRegTest
 
                 if (lastLocalRev != lastRemoteRev)
                 {
-                    int maxFilesPerPage = 100;
-                    if (lastRemoteRev - lastLocalRev > maxFilesPerPage)
+                    if (lastRemoteRev - lastLocalRev > 200)
                         bootcdRevs = GetRevList(wc, "http://iso.reactos.org/bootcd/");
                     else
                         bootcdRevs.AddRange(GetAdditionalRevList(wc, lastLocalRev + 1, lastRemoteRev));
