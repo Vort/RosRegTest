@@ -6,7 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+using System.Threading;
 using System.Windows;
 
 using Microsoft.Win32;
@@ -66,9 +66,9 @@ namespace RosRegTest
             List<int> revList = new List<int>();
 
             byte[] rawHtmlData = wc.DownloadData(string.Format(
-                "https://reactos.org/sites/all/modules/reactos/getbuilds/" +
-                "ajax-getfiles.php?filelist=1&startrev={0}&endrev={1}&" +
-                "bootcd-dbg=1&livecd-dbg=0&bootcd-rel=0&livecd-rel=0&requesttype=1&",
+                "http://iso.reactos.org/scripts/ajax-getfiles-provider.php?" +
+                "filelist=1&startrev={0}&endrev={1}&bootcd-dbg=1&" + 
+                "livecd-dbg=0&bootcd-rel=0&livecd-rel=0&requesttype=1&",
                 startRev, endRev));
             string rawStr = Encoding.UTF8.GetString(rawHtmlData);
 
@@ -151,12 +151,19 @@ namespace RosRegTest
                     "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
 
-            InitRevList();
-
-            RevTextBox.Text = revToUrl.Keys.Max().ToString();
-            RevTextBox.CaretIndex = RevTextBox.Text.Length;
-            RevTextBox.Focus();
-            AutoStartCheckBox.IsEnabled = false;
+            Thread thread = new Thread(() =>
+            {
+                InitRevList();
+                Dispatcher.Invoke(() =>
+                {
+                    RevTextBox.Text = revToUrl.Keys.Max().ToString();
+                    RevTextBox.CaretIndex = RevTextBox.Text.Length;
+                    AutoStartCheckBox.IsEnabled = false;
+                    SyncLabel.Visibility = Visibility.Hidden;
+                    RevTextBox.Focus();
+                });
+            });
+            thread.Start();
         }
 
         private void CloneCdDirectory(string dir, CDReader cdr, CDBuilder cdb)
@@ -222,7 +229,7 @@ namespace RosRegTest
             AddFileTextBox.IsEnabled = false;
             AutoStartCheckBox.IsEnabled = false;
 
-            Task task = new Task(() =>
+            Thread thread = new Thread(() =>
                 {
                     string filename = string.Format("bootcd-{0}-dbg", revision);
                     string filename7z = filename + ".7z";
@@ -314,7 +321,7 @@ namespace RosRegTest
                         AutoStartCheckBox.IsEnabled = AddFileTextBox.Text != "";
                     });
                 });
-            task.Start();
+            thread.Start();
         }
 
         private void RevTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
