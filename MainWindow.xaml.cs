@@ -209,7 +209,7 @@ namespace RosRegTest
             proc.WaitForExit();
         }
 
-        private void Run(int revision, string additionalFileName, bool autoStartChecked)
+        private string Run(int revision, string additionalFileName, bool autoStartChecked)
         {
             string filename = string.Format("bootcd-{0}-dbg", revision);
 
@@ -232,7 +232,7 @@ namespace RosRegTest
                     }
                     catch (WebException)
                     {
-                        return;
+                        return "File download failed:\n  '" + revToUrl[revision] + "'";
                     }
 
                     File.Move(filename7zTemp, filename7z);
@@ -303,6 +303,19 @@ namespace RosRegTest
             Exec(vboxManagePath, storageAttachCmd1);
             Exec(vboxManagePath, storageAttachCmd2);
             Exec(vboxManagePath, startCmd);
+
+            return null;
+        }
+
+        private bool CheckFile(string fileName)
+        {
+            if (!File.Exists(fileName))
+            {
+                MessageBox.Show("File not found: '" + fileName + "'", "Error",
+                    MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return false;
+            }
+            return true;
         }
 
         private void RunButton_Click(object sender, RoutedEventArgs e)
@@ -313,7 +326,11 @@ namespace RosRegTest
             if (!revToUrl.ContainsKey(revision))
                 return;
 
-            if (!File.Exists("unattend.inf"))
+            if (!CheckFile("7z.dll"))
+                return;
+            if (!CheckFile("7z64.dll"))
+                return;
+            if (!CheckFile("unattend.inf"))
                 return;
 
             string additionalFileName = null;
@@ -321,7 +338,7 @@ namespace RosRegTest
                 additionalFileName = AddFileTextBox.Text;
 
             if (additionalFileName != null)
-                if (!File.Exists(additionalFileName))
+                if (!CheckFile(additionalFileName))
                     return;
 
             bool autoStartChecked = AutoStartCheckBox.IsChecked == true;
@@ -333,7 +350,12 @@ namespace RosRegTest
 
             Thread thread = new Thread(() =>
                 {
-                    Run(revision, additionalFileName, autoStartChecked);
+                    string errorMsg = Run(revision, additionalFileName, autoStartChecked);
+                    if (errorMsg != null)
+                    {
+                        MessageBox.Show(errorMsg, "Operation cancelled",
+                            MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                    }
 
                     Dispatcher.Invoke(() =>
                     {
