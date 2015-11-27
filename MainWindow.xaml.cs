@@ -209,6 +209,102 @@ namespace RosRegTest
             proc.WaitForExit();
         }
 
+        private void Run(int revision, string additionalFileName, bool autoStartChecked)
+        {
+            string filename = string.Format("bootcd-{0}-dbg", revision);
+
+            string filename7z = filename + ".7z";
+            string filenameIso = filename + ".iso";
+
+            if (!File.Exists(filenameIso))
+            {
+                string filename7zTemp = filename7z + ".temp";
+                string filenameIsoTemp = filenameIso + ".temp";
+
+                if (!File.Exists(filename7z))
+                {
+                    File.Delete(filename7zTemp);
+
+                    WebClient wc = new WebClient();
+                    try
+                    {
+                        wc.DownloadFile(revToUrl[revision], filename7zTemp);
+                    }
+                    catch (WebException)
+                    {
+                        return;
+                    }
+
+                    File.Move(filename7zTemp, filename7z);
+                }
+
+                File.Delete(filenameIsoTemp);
+
+                FileStream isotmpfs = File.Create(filenameIsoTemp);
+                FileStream szfs = File.Open(filename7z, FileMode.Open, FileAccess.Read);
+                SevenZipExtractor sze = new SevenZipExtractor(szfs);
+                sze.ExtractFile(filenameIso, isotmpfs);
+                isotmpfs.Close();
+                szfs.Close();
+
+                File.Move(filenameIsoTemp, filenameIso);
+                File.Delete(filename7z);
+            }
+
+
+            string filenameIsoUnatt = filename + "_unatt.iso";
+            string filenameIsoUnattTemp = filenameIsoUnatt + ".temp";
+            File.Delete(filenameIsoUnattTemp);
+            File.Delete(filenameIsoUnatt);
+
+            FileStream isofs = File.Open(filenameIso, FileMode.Open, FileAccess.Read);
+            CDReader cdr = new CDReader(isofs, true);
+            CDBuilder cdb = new CDBuilder();
+            cdb.VolumeIdentifier = cdr.VolumeLabel;
+            CloneCdDirectory("", cdr, cdb);
+
+            string unattText = File.ReadAllText("unattend.inf", Encoding.ASCII);
+            if (autoStartChecked && (additionalFileName != null))
+                unattText = unattText + "[GuiRunOnce]\n" + "cmd.exe /c start d:\\" + additionalFileName + "\n\n";
+
+            cdb.AddFile("reactos\\unattend.inf", Encoding.ASCII.GetBytes(unattText));
+            if (additionalFileName != null)
+                cdb.AddFile(additionalFileName, additionalFileName);
+
+            Stream bootImgStr = cdr.OpenBootImage();
+            cdb.SetBootImage(bootImgStr, cdr.BootEmulation, cdr.BootLoadSegment);
+            bootImgStr.Close();
+
+            cdb.Build(filenameIsoUnattTemp);
+            isofs.Close();
+
+            File.Move(filenameIsoUnattTemp, filenameIsoUnatt);
+
+
+            string vmName = string.Format("ReactOS_r{0}", revision);
+            string diskName = Environment.CurrentDirectory + "\\" + vmName + "\\" + vmName + ".vdi";
+            string fullIsoName = Environment.CurrentDirectory + "\\" + filenameIsoUnatt;
+            string deleteVmCmd = string.Format("unregistervm --name {0}", vmName);
+            string createVmCmd = string.Format(
+                "createvm --name {0} --basefolder {1} --ostype WindowsXP --register",
+                vmName, Environment.CurrentDirectory);
+            string modifyVmCmd = string.Format("modifyvm {0} --memory 256 --vram 16 --boot1 disk --boot2 dvd", vmName);
+            string storageCtlCmd = string.Format("storagectl {0} --name \"IDE Controller\" --add ide", vmName);
+            string createMediumCmd = string.Format("createmedium disk --filename {0} --size 2048", diskName);
+            string storageAttachCmd1 = string.Format("storageattach {0} --port 0 --device 0 --storagectl \"IDE Controller\" --type hdd --medium {1}", vmName, diskName);
+            string storageAttachCmd2 = string.Format("storageattach {0} --port 1 --device 0 --storagectl \"IDE Controller\" --type dvddrive --medium {1}", vmName, fullIsoName);
+            string startCmd = string.Format("startvm {0}", vmName);
+
+            Exec(vboxManagePath, deleteVmCmd);
+            Exec(vboxManagePath, createVmCmd);
+            Exec(vboxManagePath, modifyVmCmd);
+            Exec(vboxManagePath, storageCtlCmd);
+            Exec(vboxManagePath, createMediumCmd);
+            Exec(vboxManagePath, storageAttachCmd1);
+            Exec(vboxManagePath, storageAttachCmd2);
+            Exec(vboxManagePath, startCmd);
+        }
+
         private void RunButton_Click(object sender, RoutedEventArgs e)
         {
             int revision = 0;
@@ -228,11 +324,6 @@ namespace RosRegTest
                 if (!File.Exists(additionalFileName))
                     return;
 
-            bool additionalFileFound = false;
-            if (additionalFileName != null)
-                if (File.Exists(additionalFileName))
-                    additionalFileFound = true;
-
             bool autoStartChecked = AutoStartCheckBox.IsChecked == true;
 
             RunButton.IsEnabled = false;
@@ -242,87 +333,7 @@ namespace RosRegTest
 
             Thread thread = new Thread(() =>
                 {
-                    string filename = string.Format("bootcd-{0}-dbg", revision);
-                    string filename7z = filename + ".7z";
-
-                    if (!File.Exists(filename7z))
-                    {
-                        if (File.Exists(filename7z + ".temp"))
-                            File.Delete(filename7z + ".temp");
-
-                        WebClient wc = new WebClient();
-                        wc.DownloadFile(revToUrl[revision], filename7z + ".temp");
-
-                        File.Move(filename7z + ".temp", filename7z);
-                    }
-
-                    string filenameIso = filename + ".iso";
-                    if (!File.Exists(filenameIso))
-                    {
-                        if (File.Exists(filenameIso + ".temp"))
-                            File.Delete(filenameIso + ".temp");
-
-                        FileStream fs = File.Create(filenameIso + ".temp");
-                        SevenZipExtractor sze = new SevenZipExtractor(filename7z);
-                        sze.ExtractFile(filenameIso, fs);
-                        fs.Close();
-
-                        File.Move(filenameIso + ".temp", filenameIso);
-                    }
-
-                    string filenameIsoUnatt = filename + "_unatt.iso";
-                    if (File.Exists(filenameIsoUnatt + ".temp"))
-                        File.Delete(filenameIsoUnatt + ".temp");
-                    if (File.Exists(filenameIsoUnatt))
-                        File.Delete(filenameIsoUnatt);
-
-                    FileStream isofs = File.Open(filenameIso, FileMode.Open, FileAccess.Read);
-                    CDReader cdr = new CDReader(isofs, true);
-                    CDBuilder cdb = new CDBuilder();
-                    cdb.VolumeIdentifier = cdr.VolumeLabel;
-                    CloneCdDirectory("", cdr, cdb);
-
-                    string unattText = File.ReadAllText("unattend.inf", Encoding.ASCII);
-                    if (autoStartChecked)
-                        if (additionalFileFound)
-                            unattText = unattText + "[GuiRunOnce]\n" + "cmd.exe /c start d:\\" + additionalFileName + "\n\n";
-
-                    cdb.AddFile("reactos\\unattend.inf", Encoding.ASCII.GetBytes(unattText));
-                    if (additionalFileFound)
-                        cdb.AddFile(additionalFileName, additionalFileName);
-
-                    Stream bootImgStr = cdr.OpenBootImage();
-                    cdb.SetBootImage(bootImgStr, cdr.BootEmulation, cdr.BootLoadSegment);
-                    bootImgStr.Close();
-
-                    cdb.Build(filenameIsoUnatt + ".temp");
-                    isofs.Close();
-
-                    File.Move(filenameIsoUnatt + ".temp", filenameIsoUnatt);
-
-
-                    string vmName = string.Format("ReactOS_r{0}", revision);
-                    string diskName = Environment.CurrentDirectory + "\\" + vmName + "\\" + vmName + ".vdi";
-                    string fullIsoName = Environment.CurrentDirectory + "\\" + filenameIsoUnatt;
-                    string deleteVmCmd = string.Format("unregistervm --name {0}", vmName);
-                    string createVmCmd = string.Format(
-                        "createvm --name {0} --basefolder {1} --ostype WindowsXP --register",
-                        vmName, Environment.CurrentDirectory);
-                    string modifyVmCmd = string.Format("modifyvm {0} --memory 256 --vram 16 --boot1 disk --boot2 dvd", vmName);
-                    string storageCtlCmd = string.Format("storagectl {0} --name \"IDE Controller\" --add ide", vmName);
-                    string createMediumCmd = string.Format("createmedium disk --filename {0} --size 2048", diskName);
-                    string storageAttachCmd1 = string.Format("storageattach {0} --port 0 --device 0 --storagectl \"IDE Controller\" --type hdd --medium {1}", vmName, diskName);
-                    string storageAttachCmd2 = string.Format("storageattach {0} --port 1 --device 0 --storagectl \"IDE Controller\" --type dvddrive --medium {1}", vmName, fullIsoName);
-                    string startCmd = string.Format("startvm {0}", vmName);
-
-                    Exec(vboxManagePath, deleteVmCmd);
-                    Exec(vboxManagePath, createVmCmd);
-                    Exec(vboxManagePath, modifyVmCmd);
-                    Exec(vboxManagePath, storageCtlCmd);
-                    Exec(vboxManagePath, createMediumCmd);
-                    Exec(vboxManagePath, storageAttachCmd1);
-                    Exec(vboxManagePath, storageAttachCmd2);
-                    Exec(vboxManagePath, startCmd);
+                    Run(revision, additionalFileName, autoStartChecked);
 
                     Dispatcher.Invoke(() =>
                     {
