@@ -252,6 +252,28 @@ namespace RosRegTest
             }
 
 
+            string vmName = string.Format("ReactOS_r{0}", revision);
+            string diskName = Environment.CurrentDirectory + "\\" + vmName + "\\" + vmName + ".vdi";
+
+            if (File.Exists(diskName))
+            {
+                FileStream fs = null;
+                try
+                {
+                    fs = File.Open(diskName, FileMode.Open, FileAccess.Read, FileShare.None);
+                }
+                catch (IOException)
+                {
+                    return "Virtual machine '" + vmName + "' is already running";
+                }
+                finally
+                {
+                    if (fs != null)
+                        fs.Close();
+                }
+            }
+
+
             string filenameIsoUnatt = filename + "_unatt.iso";
             string filenameIsoUnattTemp = filenameIsoUnatt + ".temp";
             File.Delete(filenameIsoUnattTemp);
@@ -281,8 +303,6 @@ namespace RosRegTest
             File.Move(filenameIsoUnattTemp, filenameIsoUnatt);
 
 
-            string vmName = string.Format("ReactOS_r{0}", revision);
-            string diskName = Environment.CurrentDirectory + "\\" + vmName + "\\" + vmName + ".vdi";
             string fullIsoName = Environment.CurrentDirectory + "\\" + filenameIsoUnatt;
             string deleteVmCmd = string.Format("unregistervm --name {0}", vmName);
             string createVmCmd = string.Format(
