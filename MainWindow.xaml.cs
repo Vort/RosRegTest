@@ -355,7 +355,7 @@ namespace RosRegTest
 
             string additionalFileName = null;
             if (AddFileTextBox.Text != "")
-                additionalFileName = AddFileTextBox.Text;
+                additionalFileName = AddFileTextBox.Text.TrimEnd();
 
             if (additionalFileName != null)
                 if (!CheckFile(additionalFileName))
