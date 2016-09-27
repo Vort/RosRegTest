@@ -70,7 +70,7 @@ namespace RosRegTest
             for (; ; )
             {
                 byte[] rawHtmlData = wc.DownloadData(string.Format(
-                    "http://iso.reactos.org/scripts/ajax-getfiles-provider.php?" +
+                    "https://iso.reactos.org/scripts/ajax-getfiles-provider.php?" +
                     "filelist=1&startrev={0}&endrev={1}&bootcd-dbg=1&" +
                     "livecd-dbg=0&bootcd-rel=0&livecd-rel=0",
                     pageStartRev, endRev));
@@ -114,7 +114,7 @@ namespace RosRegTest
             List<int> bootcdOldRevs = new List<int>();
             if (!File.Exists("bootcd_old_rev_list.txt"))
             {
-                bootcdOldRevs = GetRevList(wc, "http://iso.reactos.org/bootcd_old/");
+                bootcdOldRevs = GetRevList(wc, "https://iso.reactos.org/bootcd_old/");
                 WriteRevList(bootcdOldRevs, "bootcd_old_rev_list.txt");
             }
             else
@@ -125,21 +125,21 @@ namespace RosRegTest
             List<int> bootcdRevs = new List<int>();
             if (!File.Exists("bootcd_rev_list.txt"))
             {
-                bootcdRevs = GetRevList(wc, "http://iso.reactos.org/bootcd/");
+                bootcdRevs = GetRevList(wc, "https://iso.reactos.org/bootcd/");
                 WriteRevList(bootcdRevs, "bootcd_rev_list.txt");
             }
             else
             {
                 bootcdRevs.AddRange(ReadRevList("bootcd_rev_list.txt"));
 
-                string url = "http://iso.reactos.org/bootcd/latest_rev";
+                string url = "https://iso.reactos.org/bootcd/latest_rev";
                 int lastRemoteRev = int.Parse(Encoding.ASCII.GetString(wc.DownloadData(url)));
                 int lastLocalRev = bootcdRevs[bootcdRevs.Count - 1];
 
                 if (lastLocalRev != lastRemoteRev)
                 {
                     if (lastRemoteRev - lastLocalRev > 200)
-                        bootcdRevs = GetRevList(wc, "http://iso.reactos.org/bootcd/");
+                        bootcdRevs = GetRevList(wc, "https://iso.reactos.org/bootcd/");
                     else
                         bootcdRevs.AddRange(GetAdditionalRevList(wc, lastLocalRev + 1, lastRemoteRev));
                     WriteRevList(bootcdRevs, "bootcd_rev_list.txt");
@@ -147,9 +147,9 @@ namespace RosRegTest
             }
 
             foreach (int revision in bootcdOldRevs)
-                revToUrl.Add(revision, string.Format("{0}bootcd-{1}-dbg.7z", "http://iso.reactos.org/bootcd_old/", revision));
+                revToUrl[revision] = string.Format("{0}bootcd-{1}-dbg.7z", "https://iso.reactos.org/bootcd_old/", revision);
             foreach (int revision in bootcdRevs)
-                revToUrl.Add(revision, string.Format("{0}bootcd-{1}-dbg.7z", "http://iso.reactos.org/bootcd/", revision));
+                revToUrl[revision] = string.Format("{0}bootcd-{1}-dbg.7z", "https://iso.reactos.org/bootcd/", revision);
         }
 
         public MainWindow()
@@ -285,6 +285,9 @@ namespace RosRegTest
             cdb.VolumeIdentifier = cdr.VolumeLabel;
             CloneCdDirectory("", cdr, cdb);
 
+            if (!File.Exists("unattend.inf"))
+                File.WriteAllText("unattend.inf", RosRegTest.Resources.unattend, Encoding.ASCII);
+
             string unattText = File.ReadAllText("unattend.inf", Encoding.ASCII);
             if (autoStartChecked && (additionalFileName != null))
                 unattText = unattText + "[GuiRunOnce]\n" + "cmd.exe /c start d:\\" + additionalFileName + "\n\n";
@@ -344,13 +347,6 @@ namespace RosRegTest
             if (!int.TryParse(RevTextBox.Text, out revision))
                 return;
             if (!revToUrl.ContainsKey(revision))
-                return;
-
-            if (!CheckFile("7z.dll"))
-                return;
-            if (!CheckFile("7z64.dll"))
-                return;
-            if (!CheckFile("unattend.inf"))
                 return;
 
             string additionalFileName = null;

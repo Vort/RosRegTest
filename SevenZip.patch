@@ -1,0 +1,50 @@
+Index: SevenZip/LibraryManager.cs
+===================================================================
+--- SevenZip/LibraryManager.cs	(revision 91048)
++++ SevenZip/LibraryManager.cs	(working copy)
+@@ -56,8 +56,10 @@
+         ///     - Built decoders: LZMA, PPMD, BCJ, BCJ2, COPY, AES-256 Encryption, BZip2, Deflate.
+         /// 7z.dll (from the 7-zip distribution) supports every InArchiveFormat for encoding and decoding.
+         /// </remarks>
+-        private static string _libraryFileName = ConfigurationManager.AppSettings["7zLocation"] ??
+-            Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "7z.dll");
++        //private static string _libraryFileName = ConfigurationManager.AppSettings["7zLocation"] ??
++        //    Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "7z.dll");
++        private static string _libraryFileName = "7z.dll";
++
+ #endif
+ #if WINCE 		
+         private static string _libraryFileName =
+@@ -138,6 +140,7 @@
+ #if !WINCE && !MONO
+                 if (_modulePtr == IntPtr.Zero)
+                 {
++                    /*
+                     if (!File.Exists(_libraryFileName))
+                     {
+                         throw new SevenZipLibraryException("DLL file does not exist.");
+@@ -145,6 +148,10 @@
+                     if ((_modulePtr = NativeMethods.LoadLibrary(_libraryFileName)) == IntPtr.Zero)
+                     {
+                         throw new SevenZipLibraryException("failed to load library.");
++                    }*/
++                    if ((_modulePtr = NativeMethods.GetModuleHandle("7z" + (IntPtr.Size == 8 ? "64" : "") + ".dll")) == IntPtr.Zero)
++                    {
++                        throw new SevenZipLibraryException("failed to load library.");
+                     }
+                     if (NativeMethods.GetProcAddress(_modulePtr, "GetHandlerProperty") == IntPtr.Zero)
+                     {
+Index: SevenZip/NativeMethods.cs
+===================================================================
+--- SevenZip/NativeMethods.cs	(revision 91048)
++++ SevenZip/NativeMethods.cs	(working copy)
+@@ -36,6 +36,9 @@
+ 
+         #endregion
+ 
++        [DllImport("kernel32.dll")]
++        public static extern IntPtr GetModuleHandle(string lpModuleName);
++
+         [DllImport("kernel32.dll", BestFitMapping = false, ThrowOnUnmappableChar = true)]
+         public static extern IntPtr LoadLibrary([MarshalAs(UnmanagedType.LPStr)] string fileName);
+ 
