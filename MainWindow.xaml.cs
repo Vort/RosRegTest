@@ -311,7 +311,7 @@ namespace RosRegTest
             string createVmCmd = string.Format(
                 "createvm --name {0} --basefolder {1} --ostype WindowsXP --register",
                 vmName, Environment.CurrentDirectory);
-            string modifyVmCmd = string.Format("modifyvm {0} --memory 256 --vram 16 --boot1 disk --boot2 dvd", vmName);
+            string modifyVmCmd = string.Format("modifyvm {0} --memory 256 --vram 16 --nictype1 Am79C973 --audio none --boot1 disk --boot2 dvd", vmName);
             string storageCtlCmd = string.Format("storagectl {0} --name \"IDE Controller\" --add ide", vmName);
             string createMediumCmd = string.Format("createmedium disk --filename {0} --size 2048", diskName);
             string storageAttachCmd1 = string.Format("storageattach {0} --port 0 --device 0 --storagectl \"IDE Controller\" --type hdd --medium {1}", vmName, diskName);
