@@ -156,6 +156,10 @@ namespace RosRegTest
         {
             InitializeComponent();
 
+            string[] args = Environment.GetCommandLineArgs();
+            if (args.Length > 1)
+                AddFileTextBox.Text = args[1];
+
             if (!InitVBoxManagePath())
             {
                 MessageBox.Show("VirtualBox installation not found",
