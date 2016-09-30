@@ -209,7 +209,7 @@ namespace RosRegTest
             proc.WaitForExit();
         }
 
-        private string Run(int revision, string additionalFileName, bool autoStartChecked)
+        private string Run(int revision, string additionalFilePath, bool autoStartChecked)
         {
             string filename = string.Format("bootcd-{0}-dbg", revision);
 
@@ -288,13 +288,17 @@ namespace RosRegTest
             if (!File.Exists("unattend.inf"))
                 File.WriteAllText("unattend.inf", RosRegTest.Resources.unattend, Encoding.ASCII);
 
+            string additionalFileName = null;
+            if (additionalFilePath != null)
+                additionalFileName = Path.GetFileName(additionalFilePath);
+
             string unattText = File.ReadAllText("unattend.inf", Encoding.ASCII);
             if (autoStartChecked && (additionalFileName != null))
                 unattText = unattText + "[GuiRunOnce]\n" + "cmd.exe /c start d:\\" + additionalFileName + "\n\n";
 
             cdb.AddFile("reactos\\unattend.inf", Encoding.ASCII.GetBytes(unattText));
             if (additionalFileName != null)
-                cdb.AddFile(additionalFileName, additionalFileName);
+                cdb.AddFile(additionalFileName, additionalFilePath);
 
             Stream bootImgStr = cdr.OpenBootImage();
             cdb.SetBootImage(bootImgStr, cdr.BootEmulation, cdr.BootLoadSegment);
@@ -349,12 +353,12 @@ namespace RosRegTest
             if (!revToUrl.ContainsKey(revision))
                 return;
 
-            string additionalFileName = null;
+            string additionalFilePath = null;
             if (AddFileTextBox.Text != "")
-                additionalFileName = AddFileTextBox.Text.TrimEnd();
+                additionalFilePath = AddFileTextBox.Text.TrimEnd();
 
-            if (additionalFileName != null)
-                if (!CheckFile(additionalFileName))
+            if (additionalFilePath != null)
+                if (!CheckFile(additionalFilePath))
                     return;
 
             bool autoStartChecked = AutoStartCheckBox.IsChecked == true;
@@ -366,7 +370,7 @@ namespace RosRegTest
 
             Thread thread = new Thread(() =>
                 {
-                    string errorMsg = Run(revision, additionalFileName, autoStartChecked);
+                    string errorMsg = Run(revision, additionalFilePath, autoStartChecked);
                     if (errorMsg != null)
                     {
                         MessageBox.Show(errorMsg, "Operation cancelled",
