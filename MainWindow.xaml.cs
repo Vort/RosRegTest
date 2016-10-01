@@ -156,6 +156,8 @@ namespace RosRegTest
         {
             InitializeComponent();
 
+            SyncLabel.Visibility = Visibility.Visible;
+
             string[] args = Environment.GetCommandLineArgs();
             if (args.Length > 1)
                 AddFileTextBox.Text = args[1];
@@ -173,7 +175,7 @@ namespace RosRegTest
                 {
                     RevTextBox.Text = revToUrl.Keys.Max().ToString();
                     RevTextBox.CaretIndex = RevTextBox.Text.Length;
-                    AutoStartCheckBox.IsEnabled = false;
+                    AutoStartCheckBox.IsEnabled = AddFileTextBox.Text != "";
                     SyncLabel.Visibility = Visibility.Hidden;
                     RevTextBox.Focus();
                 });
