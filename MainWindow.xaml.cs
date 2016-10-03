@@ -405,5 +405,23 @@ namespace RosRegTest
         {
             AutoStartCheckBox.IsEnabled = AddFileTextBox.Text != "";
         }
+
+        private void AddFileTextBox_PreviewDragOver(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                e.Effects = DragDropEffects.Copy;
+                e.Handled = true;
+            }
+        }
+
+        private void AddFileTextBox_Drop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+                AddFileTextBox.Text = files[0];
+            }
+        }
     }
 }

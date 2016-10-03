@@ -20,7 +20,7 @@
         <TextBox Name="RevTextBox" VerticalAlignment="Top" TextChanged="RevTextBox_TextChanged" Grid.Row="1" TabIndex="1" />
         <Button Name="RunButton" Content="Run!" VerticalAlignment="Top" Click="RunButton_Click" Grid.Column="2" IsDefault="True" Grid.Row="1" TabIndex="4"/>
         <Label Content="Additional file:" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="2" Grid.ColumnSpan="3" />
-        <TextBox Name="AddFileTextBox" Text="" VerticalAlignment="Top" Grid.Row="3" TextChanged="AddFileTextBox_TextChanged" Grid.ColumnSpan="3" TabIndex="2" />
+        <TextBox Name="AddFileTextBox" Text="" AllowDrop="True" VerticalAlignment="Top" Grid.Row="3" TextChanged="AddFileTextBox_TextChanged" Grid.ColumnSpan="3" TabIndex="2" Drop="AddFileTextBox_Drop" PreviewDragEnter="AddFileTextBox_PreviewDragOver" PreviewDragOver="AddFileTextBox_PreviewDragOver" />
         <CheckBox Name="AutoStartCheckBox" Content="Auto start" HorizontalAlignment="Left" Grid.Row="4" VerticalAlignment="Top" Height="16" Width="69" Margin="0,8,0,0" IsChecked="True" TabIndex="3" Grid.ColumnSpan="3" />
         <Label Name="SyncLabel" Grid.ColumnSpan="3" Content="Synchronizing&#10; revisions list..." Grid.RowSpan="5" Background="White" FontSize="24" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Visibility="Hidden" />
     </Grid>
