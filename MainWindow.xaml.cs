@@ -138,7 +138,8 @@ namespace RosRegTest
 
                 if (lastLocalRev != lastRemoteRev)
                 {
-                    if (lastRemoteRev - lastLocalRev > 200)
+                    int revDelta = lastRemoteRev - lastLocalRev;
+                    if (revDelta > 200 || revDelta < 0)
                         bootcdRevs = GetRevList(wc, "https://iso.reactos.org/bootcd/");
                     else
                         bootcdRevs.AddRange(GetAdditionalRevList(wc, lastLocalRev + 1, lastRemoteRev));
