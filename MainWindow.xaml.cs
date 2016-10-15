@@ -69,27 +69,33 @@ namespace RosRegTest
             bool moreFiles = false;
             for (; ; )
             {
-                byte[] rawHtmlData = wc.DownloadData(string.Format(
+                string htmlString = wc.DownloadString(string.Format(
                     "https://iso.reactos.org/scripts/ajax-getfiles-provider.php?" +
                     "filelist=1&startrev={0}&endrev={1}&bootcd-dbg=1&" +
                     "livecd-dbg=0&bootcd-rel=0&livecd-rel=0",
                     pageStartRev, endRev));
-                string rawStr = Encoding.UTF8.GetString(rawHtmlData);
 
                 MatchCollection matches = Regex.Matches(
-                    rawStr, "<name>bootcd-([0-9]+)-dbg\\.7z</name>");
+                    htmlString, "<name>bootcd-([0-9]+)-dbg\\.7z</name>");
                 foreach (Match match in matches)
                     revSet.Add(int.Parse(match.Groups[1].Value));
 
-                moreFiles = rawStr.IndexOf("<morefiles>1</morefiles>") != -1;
+                moreFiles = htmlString.IndexOf("<morefiles>1</morefiles>") != -1;
                 if (!moreFiles)
                     break;
 
                 pageStartRev = int.Parse(
-                    Regex.Match(rawStr, "<lastrev>([0-9]+)</lastrev>").Groups[1].Value);
+                    Regex.Match(htmlString, "<lastrev>([0-9]+)</lastrev>").Groups[1].Value);
             }
 
             return revSet.ToList();
+        }
+
+        private int GetLatestSvnRevision(WebClient wc)
+        {
+            string xmlString = wc.DownloadString("https://svn.reactos.org/svnact/svn_activity.xml");
+            Match match = Regex.Match(xmlString, "<id>([0-9]+)</id>");
+            return int.Parse(match.Groups[1].Value);
         }
 
         void WriteRevList(List<int> revList, string fileName)
@@ -132,17 +138,15 @@ namespace RosRegTest
             {
                 bootcdRevs.AddRange(ReadRevList("bootcd_rev_list.txt"));
 
-                string url = "https://iso.reactos.org/bootcd/latest_rev";
-                int lastRemoteRev = int.Parse(Encoding.ASCII.GetString(wc.DownloadData(url)));
+                int lastSvnRev = GetLatestSvnRevision(wc);
                 int lastLocalRev = bootcdRevs[bootcdRevs.Count - 1];
 
-                if (lastLocalRev != lastRemoteRev)
+                if (lastLocalRev != lastSvnRev)
                 {
-                    int revDelta = lastRemoteRev - lastLocalRev;
-                    if (revDelta > 200 || revDelta < 0)
+                    if (lastSvnRev - lastLocalRev > 200)
                         bootcdRevs = GetRevList(wc, "https://iso.reactos.org/bootcd/");
                     else
-                        bootcdRevs.AddRange(GetAdditionalRevList(wc, lastLocalRev + 1, lastRemoteRev));
+                        bootcdRevs.AddRange(GetAdditionalRevList(wc, lastLocalRev + 1, lastSvnRev));
                     WriteRevList(bootcdRevs, "bootcd_rev_list.txt");
                 }
             }
