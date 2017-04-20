@@ -117,17 +117,6 @@ namespace RosRegTest
 
             revToUrl = new Dictionary<int, string>();
 
-            List<int> bootcdOldRevs = new List<int>();
-            if (!File.Exists("bootcd_old_rev_list.txt"))
-            {
-                bootcdOldRevs = GetRevList(wc, "https://iso.reactos.org/bootcd_old/");
-                WriteRevList(bootcdOldRevs, "bootcd_old_rev_list.txt");
-            }
-            else
-            {
-                bootcdOldRevs.AddRange(ReadRevList("bootcd_old_rev_list.txt"));
-            }
-
             List<int> bootcdRevs = new List<int>();
             if (!File.Exists("bootcd_rev_list.txt"))
             {
@@ -150,8 +139,6 @@ namespace RosRegTest
                 }
             }
 
-            foreach (int revision in bootcdOldRevs)
-                revToUrl[revision] = string.Format("{0}bootcd-{1}-dbg.7z", "https://iso.reactos.org/bootcd_old/", revision);
             foreach (int revision in bootcdRevs)
                 revToUrl[revision] = string.Format("{0}bootcd-{1}-dbg.7z", "https://iso.reactos.org/bootcd/", revision);
         }
