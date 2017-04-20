@@ -1,4 +1,4 @@
-*.suo
+.vs
 *.vsp
 /bin/Debug/
 /bin/Release/
